@@ -90,3 +90,22 @@ runtime root, including symlink and parent-directory aliases, so archives contai
 credentials cannot enter workspace. Production mounts only workspace/config/state/
 auth/log directories; the bridge source checkout and host registry credentials are
 not mounted. Images are built and published after checks in GitHub Actions.
+
+
+## Opt-in Bubblewrap compatibility
+
+The dedicated profiles in deploy/security are based on pinned Moby defaults.
+They add filtered namespace creation and the mount/chroot operations required by
+Bubblewrap, with a separate enforcing AppArmor policy. This deliberately extends
+the outer syscall allowlist; it does not disable seccomp/AppArmor or add app
+capabilities. Kernel capability checks still gate mounts before entry into an owned
+user namespace. More unprivileged namespace kernel code becomes reachable: keep
+the host patched and retain the trusted-project threat model above.
+
+The compatibility installer touches only /etc/apparmor.d/takopi-codex and loads
+that named profile; it does not change global sysctls or docker-default. An explicit
+Docker-administrator installation path uses MAC_ADMIN only in a transient trusted
+loader, never in the bot. Profile inputs/loader access are administrator-trusted.
+On the target VPS, real enforcement checks passed: project writes work, writes
+to sibling/auth paths and IP socket creation fail inside the Codex sandbox.
+This supplements the unit tests; it does not establish same-UID confidentiality.

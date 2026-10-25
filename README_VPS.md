@@ -88,11 +88,19 @@ docker compose pull
 docker compose run --rm takopi /usr/local/bin/sandbox-check.sh
 ```
 
-Preflight обязателен до login/start. При ошибке остановитесь: текущая среда
-разработки ранее запрещала Bubblewrap namespaces. Landlock compatibility flag
+Preflight обязателен до login/start. Если preflight не прошёл, не запускайте бот: Docker default profile может
+запрещать Bubblewrap namespaces. Landlock compatibility flag
 не обеспечил альтернативу. На целевом VPS нужна совместимость Codex с user
 namespaces, seccomp и AppArmor. Нельзя отключать эти защиты, добавлять capabilities
 или privileged ради запуска. Entrypoint завершится при неработающем sandbox.
+
+Для проверенного Ubuntu 24.04 VPS подготовлен отдельный opt-in overlay:
+[deploy/security/README.md](deploy/security/README.md). Он сохраняет non-root,
+cap_drop ALL, no-new-privileges и Codex sandbox, добавляя необходимые правила
+namespace/mount только в профилях Takopi. Следуйте инструкции установки
+`compose.sandbox.yaml`, `security/`, `install-sandbox-profile.sh` и
+`check-sandbox.py`. Общие sysctl, docker-default и другие сервисы не меняются.
+Проверка на VPS 195.58.63.4 прошла, включая запрет записи вне проекта и IP sockets.
 
 Добавьте отдельные рабочие repositories и настройте пути в config:
 

@@ -94,3 +94,20 @@ Keep production source-free at /srv/takopi with persistent config, Codex auth,
 Takopi state, logs and separate project repositories. Add pull/recreate update,
 explicit-tag rollback, backup/restore migration instructions and architecture
 regressions. Verification outcomes: CHANGE_IMPLEMENTATION_REPORT.md.
+
+
+## Target VPS sandbox compatibility (2026-10-25)
+
+Default profiles reproduced the namespace denial on 195.58.63.4. A separate
+opt-in Moby-derived seccomp/AppArmor pair now permits Bubblewrap's namespace
+setup while retaining app UID 1001, zero capabilities, no-new-privileges and
+read-only rootfs. Real enforcement checks verified allowed project writes and
+denied sibling/auth writes plus denied IP socket creation. The host profile is
+persisted for boot; no daemon/service restart or global sysctl change was made.
+See deploy/security/README.md for policy changes, provenance and installer.
+Bot account/Telegram credentials and end-to-end account-backed acceptance remain
+a separate milestone; no account request was used for these sandbox probes.
+
+Compatibility verification: full just check 802 passed, coverage 81.86%; actionlint,
+Compose overlay merge, shell syntax and diff checks passed. Real target VPS
+enforcement passed under the persisted per-service profiles.

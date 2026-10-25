@@ -1,0 +1,6 @@
+# Opt-in Linux sandbox compatibility. Install the named AppArmor profile first.
+services:
+  takopi:
+    security_opt:
+      - apparmor=takopi-codex
+      - seccomp=./security/seccomp.json

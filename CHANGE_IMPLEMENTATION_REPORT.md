@@ -1,5 +1,10 @@
 # CHANGE IMPLEMENTATION REPORT
 
+Дополнение 2026-10-25: последующий запрос исправил совместимость sandbox на
+целевом VPS отдельными профилями Takopi. Актуальный результат и инструкции:
+[deploy/security/README.md](deploy/security/README.md). Ниже сохранён отчёт
+предшествующего deployment change request.
+
 ## 1. Что сохранено
 
 Продолжена реализация из commits `449ca12` и `a740e21`, без повторной разработки

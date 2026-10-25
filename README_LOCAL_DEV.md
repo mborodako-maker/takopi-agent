@@ -64,3 +64,7 @@ Push в `main`, tag `v*` или ручной запуск workflow `Docker` за
 проверки Compose и только затем Buildx build/publish. Никакого SSH deployment.
 Для production выберите существующий `v*` или `sha-*` tag, см. README_VPS.md.
 Изменения кода, lockfile и Dockerfile делаются здесь, а не на VPS.
+
+Для Linux-хостов с запрещённым nested user namespace используйте явно
+установленные профили по deploy/security/README.md. Enforcement-проверка
+scripts/check-sandbox.py предназначена для контейнера с этим overlay.
