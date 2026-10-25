@@ -71,6 +71,12 @@ def build_bot_commands(
         commands.append({"command": cmd, "description": description})
         seen.add(cmd)
     for cmd, description in [
+        ("projects", "list configured projects"),
+        ("status", "show project and active session"),
+        ("abort", "interrupt current project turn"),
+        ("diff", "show project changes"),
+        ("tests", "run configured project tests"),
+        ("commit", "preview staged commit and request approval"),
         ("new", "start a new thread"),
         ("ctx", "show or update context"),
         ("agent", "set default engine"),

@@ -274,16 +274,16 @@ def test_app_server_client_handles_server_requests() -> None:
 
     assert client._handle_server_request(
         {"method": "item/commandExecution/requestApproval"}
-    ) == {"decision": "accept"}
+    ) == {"decision": "decline"}
     assert client._handle_server_request(
         {"method": "item/fileChange/requestApproval"}
-    ) == {"decision": "accept"}
+    ) == {"decision": "decline"}
     assert client._handle_server_request(
         {
             "method": "item/permissions/requestApproval",
             "params": {"permissions": {"sandbox": "workspace-write"}},
         }
-    ) == {"scope": "turn", "permissions": {"sandbox": "workspace-write"}}
+    ) == {"scope": "turn", "permissions": {}}
     assert client._handle_server_request(
         {"method": "mcpServer/elicitation/request"}
     ) == {"action": "decline", "content": None}

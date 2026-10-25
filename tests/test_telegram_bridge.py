@@ -792,6 +792,7 @@ async def test_handle_file_put_writes_file(tmp_path: Path) -> None:
         final_notify=True,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -857,6 +858,7 @@ async def test_handle_file_get_sends_document_for_allowed_user(
         final_notify=True,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -1418,6 +1420,7 @@ async def test_topic_command_recreates_stale_topic(tmp_path: Path) -> None:
         final_notify=True,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -1971,6 +1974,7 @@ async def test_run_main_loop_routes_reply_to_running_resume() -> None:
         projects=_empty_projects(),
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -2040,6 +2044,7 @@ async def test_run_main_loop_ignores_duplicate_message_id_for_replies() -> None:
     )
     runtime = TransportRuntime(router=router, projects=_empty_projects())
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -2090,6 +2095,7 @@ async def test_run_main_loop_ignores_duplicate_update_id() -> None:
     runner = ScriptRunner([Return(answer="ok")], engine=CODEX_ENGINE)
     runtime = TransportRuntime(router=_make_router(runner), projects=_empty_projects())
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -2171,6 +2177,7 @@ async def test_run_main_loop_persists_topic_sessions_in_project_scope(
         config_path=tmp_path / "takopi.toml",
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -2249,6 +2256,7 @@ async def test_run_main_loop_auto_resumes_topic_default_engine(
         config_path=state_path,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -2320,6 +2328,7 @@ async def test_run_main_loop_auto_resumes_chat_sessions(tmp_path: Path) -> None:
         config_path=state_path,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -2355,6 +2364,7 @@ async def test_run_main_loop_auto_resumes_chat_sessions(tmp_path: Path) -> None:
         config_path=state_path,
     )
     cfg2 = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime2,
         chat_id=123,
@@ -2426,6 +2436,7 @@ async def test_run_main_loop_prompt_upload_uses_caption_directives(
     )
     runtime = TransportRuntime(router=_make_router(runner), projects=projects)
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -2491,6 +2502,7 @@ async def test_run_main_loop_voice_transcript_preserves_directive(
         final_notify=True,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=FakeBot(),
         runtime=runtime,
         chat_id=123,
@@ -2564,6 +2576,7 @@ async def test_run_main_loop_debounces_forwarded_messages_preserves_directives()
         final_notify=True,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=FakeBot(),
         runtime=runtime,
         chat_id=123,
@@ -2634,6 +2647,7 @@ async def test_run_main_loop_ignores_forwarded_without_prompt() -> None:
         final_notify=True,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=FakeBot(),
         runtime=runtime,
         chat_id=123,
@@ -2704,6 +2718,7 @@ async def test_run_main_loop_forwarded_document_still_uploads(
         final_notify=True,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=_UploadBot(),
         runtime=runtime,
         chat_id=123,
@@ -2796,6 +2811,7 @@ async def test_run_main_loop_prompt_upload_auto_resumes_chat_sessions(
         config_path=state_path,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -2849,6 +2865,7 @@ async def test_run_main_loop_prompt_upload_auto_resumes_chat_sessions(
         config_path=state_path,
     )
     cfg2 = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime2,
         chat_id=123,
@@ -2935,6 +2952,7 @@ async def test_run_main_loop_command_updates_chat_session_resume(
         config_path=state_path,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -2977,6 +2995,7 @@ async def test_run_main_loop_command_updates_chat_session_resume(
         config_path=state_path,
     )
     cfg2 = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime2,
         chat_id=123,
@@ -3043,6 +3062,7 @@ async def test_run_main_loop_hides_resume_line_when_disabled(
         config_path=state_path,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -3098,6 +3118,7 @@ async def test_run_main_loop_hides_resume_line_without_context(
         config_path=state_path,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -3166,6 +3187,7 @@ async def test_run_main_loop_applies_chat_bound_context(
     prefs = ChatPrefsStore(resolve_prefs_path(state_path))
     await prefs.set_context(123, RunContext(project="beta"))
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -3221,6 +3243,7 @@ async def test_run_main_loop_chat_sessions_isolate_group_senders(
         config_path=state_path,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(111, 222),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -3252,6 +3275,7 @@ async def test_run_main_loop_chat_sessions_isolate_group_senders(
         config_path=state_path,
     )
     cfg2 = TelegramBridgeConfig(
+        allowed_user_ids=(111, 222),
         bot=bot,
         runtime=runtime2,
         chat_id=123,
@@ -3301,6 +3325,7 @@ async def test_run_main_loop_new_clears_chat_sessions(tmp_path: Path) -> None:
         config_path=state_path,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -3351,6 +3376,7 @@ async def test_run_main_loop_new_clears_topic_sessions(tmp_path: Path) -> None:
         config_path=state_path,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -3396,6 +3422,7 @@ async def test_run_main_loop_replies_in_same_thread() -> None:
         projects=_empty_projects(),
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -3471,6 +3498,7 @@ async def test_run_main_loop_batches_media_group_upload(
         final_notify=True,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -3578,6 +3606,7 @@ async def test_run_main_loop_handles_command_plugins(monkeypatch) -> None:
         projects=_empty_projects(),
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -3651,6 +3680,7 @@ async def test_run_main_loop_routes_callback_to_command_plugins(monkeypatch) -> 
         projects=_empty_projects(),
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -3752,6 +3782,7 @@ async def test_run_main_loop_command_uses_project_default_engine(
         final_notify=True,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -3838,6 +3869,7 @@ async def test_run_main_loop_command_defaults_to_chat_project(
         final_notify=True,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -3908,6 +3940,7 @@ async def test_run_main_loop_refreshes_command_ids(monkeypatch) -> None:
         projects=_empty_projects(),
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,
@@ -3970,6 +4003,7 @@ async def test_run_main_loop_mentions_only_skips_voice_and_files(
         config_path=config_path,
     )
     cfg = TelegramBridgeConfig(
+        allowed_user_ids=(123, 321, 42),
         bot=bot,
         runtime=runtime,
         chat_id=123,

@@ -89,6 +89,7 @@ class ExecBridgeConfig:
 
 @dataclass(slots=True)
 class RunningTask:
+    started_at: float = field(default_factory=time.monotonic)
     resume: ResumeToken | None = None
     resume_ready: anyio.Event = field(default_factory=anyio.Event)
     cancel_requested: anyio.Event = field(default_factory=anyio.Event)

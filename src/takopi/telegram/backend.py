@@ -109,6 +109,12 @@ class TelegramBackend(TransportBackend):
         default_engine_override: str | None,
     ) -> None:
         settings = _expect_transport_settings(transport_config)
+        if not settings.allowed_user_ids or any(
+            uid <= 0 for uid in settings.allowed_user_ids
+        ):
+            raise ValueError(
+                "Telegram allowed_user_ids must contain positive numeric user IDs"
+            )
         token = settings.bot_token
         chat_id = settings.chat_id
         startup_msg = _build_startup_message(
@@ -127,8 +133,21 @@ class TelegramBackend(TransportBackend):
             presenter=presenter,
             final_notify=final_notify,
         )
+        from .approval import TelegramApprovalGateway
+
+        gateway = TelegramApprovalGateway(
+            bot,
+            state_path=config_path.with_name("vps_contexts.json"),
+            ttl=settings.approval_ttl_s,
+            audit_path=Path(
+                os.environ.get(
+                    "TAKOPI_AUDIT_LOG", str(config_path.parent / "audit.jsonl")
+                )
+            ),
+        )
         cfg = TelegramBridgeConfig(
             bot=bot,
+            approval_gateway=gateway,
             runtime=runtime,
             chat_id=chat_id,
             startup_msg=startup_msg,

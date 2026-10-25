@@ -282,6 +282,7 @@ def make_cfg(
         runtime=runtime,
         chat_id=123,
         startup_msg="",
+        allowed_user_ids=(123, 321, 42),
         exec_cfg=exec_cfg,
         forward_coalesce_s=forward_coalesce_s,
         media_group_debounce_s=media_group_debounce_s,

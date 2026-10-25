@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
 
 import anyio
@@ -233,7 +236,10 @@ async def poll_incoming(
             logger.info("loop.get_updates.failed")
             await sleep(2)
             continue
-        logger.debug("loop.updates", updates=updates)
+        health_file = os.environ.get("TAKOPI_HEALTH_FILE")
+        if health_file:
+            Path(health_file).touch()
+        logger.debug("loop.updates", count=len(updates))
         resolved_chat_ids = chat_ids() if callable(chat_ids) else chat_ids
         allowed = set(resolved_chat_ids) if resolved_chat_ids is not None else None
         if allowed is None and chat_id is not None:

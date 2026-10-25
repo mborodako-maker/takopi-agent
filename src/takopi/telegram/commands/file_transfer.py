@@ -191,9 +191,8 @@ async def _save_document_payload(
     force: bool,
 ) -> _FilePutResult:
     name = default_upload_name(document.file_name, None)
-    if (
-        document.file_size is not None
-        and document.file_size > cfg.files.max_upload_bytes
+    if document.file_size is not None and document.file_size > min(
+        cfg.files.max_upload_bytes, cfg.files.max_file_bytes
     ):
         return _FilePutResult(
             name=name,
@@ -258,7 +257,7 @@ async def _save_document_payload(
             size=None,
             error="failed to download file.",
         )
-    if len(payload) > cfg.files.max_upload_bytes:
+    if len(payload) > min(cfg.files.max_upload_bytes, cfg.files.max_file_bytes):
         return _FilePutResult(
             name=name,
             rel_path=None,
@@ -551,7 +550,7 @@ async def _handle_file_get(
                 run_root,
                 rel_path,
                 cfg.files.deny_globs,
-                max_bytes=cfg.files.max_download_bytes,
+                max_bytes=min(cfg.files.max_download_bytes, cfg.files.max_file_bytes),
             )
         except ZipTooLargeError:
             await reply(text="file is too large to send.")
@@ -563,7 +562,7 @@ async def _handle_file_get(
     else:
         try:
             size = target.stat().st_size
-            if size > cfg.files.max_download_bytes:
+            if size > min(cfg.files.max_download_bytes, cfg.files.max_file_bytes):
                 await reply(text="file is too large to send.")
                 return
             payload = target.read_bytes()
@@ -571,7 +570,7 @@ async def _handle_file_get(
             await reply(text=f"failed to read file: {exc}")
             return
         filename = target.name
-    if len(payload) > cfg.files.max_download_bytes:
+    if len(payload) > min(cfg.files.max_download_bytes, cfg.files.max_file_bytes):
         await reply(text="file is too large to send.")
         return
     sent = await cfg.bot.send_document(

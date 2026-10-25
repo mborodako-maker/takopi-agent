@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from collections import deque
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from dataclasses import dataclass
@@ -352,7 +354,7 @@ async def _drain_backlog(cfg: TelegramBridgeConfig, offset: int | None) -> int |
         if updates is None:
             logger.info("startup.backlog.failed")
             return offset
-        logger.debug("startup.backlog.updates", updates=updates)
+        logger.debug("startup.backlog.updates", count=len(updates))
         if not updates:
             if drained:
                 logger.info("startup.backlog.drained", count=drained)
@@ -1015,6 +1017,13 @@ async def run_main_loop(
     transport_config: TelegramTransportSettings | None = None,
     sleep: Callable[[float], Awaitable[None]] = anyio.sleep,
 ) -> None:
+    from ..security import CURRENT_GATEWAY
+
+    gateway = cfg.approval_gateway
+    logger.info("telegram.startup", allowed_user_count=len(cfg.allowed_user_ids))
+    gateway_token = CURRENT_GATEWAY.set(gateway)
+    if gateway is not None and os.environ.get("TAKOPI_APPROVAL_SOCKET"):
+        await gateway.start_hook_server(Path(os.environ["TAKOPI_APPROVAL_SOCKET"]))
     state = TelegramLoopState(
         running_tasks={},
         pending_prompts={},
@@ -1668,6 +1677,19 @@ async def run_main_loop(
 
                 command_id = classification.command_id
                 args_text = classification.args_text
+                from .commands.vps import COMMANDS, handle_vps_command
+
+                if command_id in COMMANDS:
+                    tg.start_soon(
+                        handle_vps_command,
+                        cfg,
+                        msg,
+                        command_id,
+                        args_text,
+                        ambient_context,
+                        state.running_tasks,
+                    )
+                    return
                 if command_id == "new":
                     forward_coalescer.cancel(forward_key)
                     if state.topic_store is not None and topic_key is not None:
@@ -1853,16 +1875,19 @@ async def run_main_loop(
             allowed_user_ids = set(cfg.allowed_user_ids)
 
             async def route_update(update: TelegramIncomingUpdate) -> None:
-                if allowed_user_ids:
-                    sender_id = update.sender_id
-                    if sender_id is None or sender_id not in allowed_user_ids:
-                        logger.debug(
-                            "update.ignored",
-                            reason="sender_not_allowed",
-                            chat_id=update.chat_id,
-                            sender_id=sender_id,
-                        )
-                        return
+                sender_id = update.sender_id
+                if sender_id is None or sender_id not in allowed_user_ids:
+                    logger.warning(
+                        "update.ignored",
+                        reason="sender_not_allowed",
+                        chat_id=update.chat_id,
+                        sender_id=sender_id,
+                    )
+                    return
+                if gateway is not None and isinstance(update, TelegramIncomingMessage):
+                    gateway.remember(
+                        update.chat_id, update.message_id, sender_id, update.thread_id
+                    )
                 if update.update_id is not None:
                     update_id = update.update_id
                     if update_id in state.seen_update_ids:
@@ -1896,7 +1921,13 @@ async def run_main_loop(
                         oldest = state.seen_messages_order.popleft()
                         state.seen_message_keys.discard(oldest)
                 if isinstance(update, TelegramCallbackQuery):
-                    if update.data == CANCEL_CALLBACK_DATA:
+                    if (
+                        update.data
+                        and update.data.startswith("approval:")
+                        and gateway is not None
+                    ):
+                        tg.start_soon(gateway.callback, update)
+                    elif update.data == CANCEL_CALLBACK_DATA:
                         tg.start_soon(
                             handle_callback_cancel,
                             cfg,
@@ -1981,4 +2012,8 @@ async def run_main_loop(
             async for update in poller_fn(cfg):
                 await route_update(update)
     finally:
+        if gateway is not None:
+            await gateway.stop()
+        CURRENT_GATEWAY.reset(gateway_token)
+        logger.info("telegram.shutdown")
         await cfg.exec_cfg.transport.close()

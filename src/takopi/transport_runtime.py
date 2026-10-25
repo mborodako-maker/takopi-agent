@@ -144,6 +144,9 @@ class TransportRuntime:
     def missing_engine_ids(self) -> tuple[EngineId, ...]:
         return self.engine_ids_with_status("missing_cli")
 
+    def project_config(self, key: str):
+        return self._projects.projects.get(key)
+
     def project_aliases(self) -> tuple[str, ...]:
         return tuple(project.alias for project in self._projects.projects.values())
 

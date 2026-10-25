@@ -64,18 +64,23 @@ ChatId = Annotated[StrictInt, BeforeValidator(_coerce_chat_id)]
 
 
 class TelegramTopicsSettings(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    model_config = ConfigDict(
+        extra="forbid", str_strip_whitespace=True, hide_input_in_errors=True
+    )
 
     enabled: bool = False
     scope: Literal["auto", "main", "projects", "all"] = "auto"
 
 
 class TelegramFilesSettings(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    model_config = ConfigDict(
+        extra="forbid", str_strip_whitespace=True, hide_input_in_errors=True
+    )
 
     max_upload_bytes: ClassVar[int] = 20 * 1024 * 1024
     max_download_bytes: ClassVar[int] = 50 * 1024 * 1024
 
+    max_file_bytes: int = Field(default=20 * 1024 * 1024, gt=0, le=50 * 1024 * 1024)
     enabled: bool = False
     auto_put: bool = True
     auto_put_mode: Literal["upload", "prompt"] = "upload"
@@ -100,11 +105,14 @@ class TelegramFilesSettings(BaseModel):
 
 
 class TelegramTransportSettings(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    model_config = ConfigDict(
+        extra="forbid", str_strip_whitespace=True, hide_input_in_errors=True
+    )
 
     bot_token: NonEmptyStr
     chat_id: ChatId
     allowed_user_ids: list[StrictInt] = Field(default_factory=list)
+    approval_ttl_s: float = Field(default=120, gt=0, le=120)
     message_overflow: Literal["trim", "split"] = "trim"
     voice_transcription: bool = False
     voice_max_bytes: StrictInt = 10 * 1024 * 1024
@@ -132,18 +140,22 @@ class PluginsSettings(BaseModel):
 
 
 class ProjectSettings(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    model_config = ConfigDict(
+        extra="forbid", str_strip_whitespace=True, hide_input_in_errors=True
+    )
 
     path: NonEmptyStr
     worktrees_dir: NonEmptyStr = ".worktrees"
     default_engine: NonEmptyStr | None = None
     worktree_base: NonEmptyStr | None = None
     chat_id: ChatId | None = None
+    test_command: NonEmptyStr | None = None
 
 
 class TakopiSettings(BaseSettings):
     model_config = SettingsConfigDict(
         extra="allow",
+        hide_input_in_errors=True,
         env_prefix="TAKOPI__",
         env_nested_delimiter="__",
         str_strip_whitespace=True,
@@ -281,6 +293,7 @@ class TakopiSettings(BaseSettings):
                 default_engine=default_engine,
                 worktree_base=worktree_base,
                 chat_id=chat_id,
+                test_command=entry.test_command,
             )
 
         if default_project is not None:

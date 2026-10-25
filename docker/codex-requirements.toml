@@ -1,0 +1,18 @@
+# Managed, root-owned and read-only in the image. Repo hooks cannot replace these.
+allow_managed_hooks_only = true
+[features]
+hooks = true
+
+[[hooks.PreToolUse]]
+matcher = ".*"
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "/opt/takopi/.venv/bin/python -m takopi.codex_hook"
+timeout = 150
+
+[[hooks.PostToolUse]]
+matcher = ".*"
+[[hooks.PostToolUse.hooks]]
+type = "command"
+command = "/opt/takopi/.venv/bin/python -m takopi.codex_hook"
+timeout = 10

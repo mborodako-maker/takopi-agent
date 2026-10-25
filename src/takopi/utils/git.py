@@ -10,7 +10,14 @@ def _run_git(
 ) -> subprocess.CompletedProcess[str] | None:
     try:
         return subprocess.run(
-            ["git", *args],
+            [
+                "git",
+                "-c",
+                "core.hooksPath=/dev/null",
+                "-c",
+                "core.fsmonitor=false",
+                *args,
+            ],
             cwd=cwd,
             check=False,
             text=True,

@@ -1,0 +1,32 @@
+# Copy to config/runtime/takopi.toml. No credentials in this file.
+transport = "telegram"
+default_engine = "codex"
+default_project = "jira-agent"
+watch_config = false
+
+[transports.telegram]
+# Supplied by entrypoint through TAKOPI__... environment variables.
+session_mode = "chat"
+approval_ttl_s = 120
+show_resume_line = true
+
+[transports.telegram.files]
+enabled = true
+max_file_bytes = 20971520
+
+[codex]
+mode = "app_server"
+
+[projects.jira-agent]
+test_command = "pytest"
+path = "/workspace/jira-agent"
+worktrees_dir = ".worktrees"
+worktree_base = "main"
+
+[projects.onas]
+path = "/workspace/onas"
+worktrees_dir = ".worktrees"
+worktree_base = "main"
+
+# Test command is trusted operator configuration, never a Telegram shell argument.
+# Add test_command = "pytest" inside a project table, for example jira-agent.

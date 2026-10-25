@@ -11,3 +11,16 @@ mutants/
 research/
 _site/
 docs/reference/changelog.md
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+auth.json
+.codex/
+.takopi/
+logs/
+workspace/
+secrets/
+config/runtime/
+*.backup.tar.gz

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from functools import partial
+from contextlib import nullcontext
 from typing import cast
 
 import anyio
@@ -26,6 +28,7 @@ from ...scheduler import ThreadScheduler
 from ...transport import MessageRef, RenderedMessage, SendOptions
 from ...transport_runtime import TransportRuntime
 from ...utils.paths import reset_run_base_dir, set_run_base_dir
+from ...security import CURRENT_GATEWAY
 from ..bridge import send_plain
 from ..engine_overrides import supports_reasoning
 
@@ -213,6 +216,11 @@ async def _run_engine(
             if cwd is not None:
                 run_fields["cwd"] = str(cwd)
             bind_run_context(**run_fields)
+            logger.info(
+                "project.selected",
+                project=context.project if context else None,
+                worktree=str(cwd),
+            )
             context_line = runtime.format_context_line(context)
             incoming = RunnerIncomingMessage(
                 channel_id=chat_id,
@@ -221,7 +229,13 @@ async def _run_engine(
                 reply_to=reply_ref,
                 thread_id=thread_id,
             )
-            with apply_run_options(run_options):
+            gateway = CURRENT_GATEWAY.get()
+            approval_scope = (
+                gateway.bind_run(chat_id, user_msg_id, cwd or Path.cwd(), context)
+                if gateway
+                else nullcontext()
+            )
+            with approval_scope, apply_run_options(run_options):
                 await handle_message(
                     exec_cfg,
                     runner=runner,

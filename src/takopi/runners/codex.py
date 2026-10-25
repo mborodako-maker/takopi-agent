@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+from ..security import (
+    CURRENT_GATEWAY,
+    CURRENT_SCOPE,
+    Classification,
+    classify_command,
+    resolve_project_path,
+)
+
 import asyncio
 import json
 import os
@@ -693,6 +701,10 @@ class _AppServerClient:
         self._turn_senders: dict[str, Any] = {}
         self._pending_by_turn: dict[str, list[dict[str, Any]]] = {}
         self._loaded_threads: set[str] = set()
+        self._approval_tasks: set[asyncio.Task] = set()
+        self._starting_scopes: dict[str, Any] = {}
+        self._items: dict[tuple[str, str], dict[str, Any]] = {}
+        self.gateway: Any = None
 
     async def start(self) -> None:
         async with self._start_lock:
@@ -714,6 +726,17 @@ class _AppServerClient:
             }
             if os.name == "posix":
                 kwargs["start_new_session"] = True
+            # Telegram credentials must never be inherited by Codex/tools.
+            kwargs["env"] = {
+                k: v
+                for k, v in os.environ.items()
+                if not k.startswith(("TELEGRAM_", "TAKOPI__"))
+                and not any(
+                    word in k.upper()
+                    for word in ("TOKEN", "PASSWORD", "SECRET", "API_KEY")
+                )
+            }
+            self.gateway = CURRENT_GATEWAY.get()
             self._proc = await anyio.open_process(cmd, **kwargs)
 
             if (
@@ -742,6 +765,7 @@ class _AppServerClient:
             if not isinstance(result, dict):
                 raise RuntimeError("codex app-server initialize returned non-object")
             await self.notify("initialized", {})
+            logger.info("codex.app_server.connected")
 
     async def notify(self, method: str, params: dict[str, Any] | None = None) -> None:
         await self._write({"method": method, "params": params or {}})
@@ -808,6 +832,8 @@ class _AppServerClient:
             raise RuntimeError("turn/steer returned unexpected turn id")
 
     async def turn_interrupt(self, thread_id: str, turn_id: str) -> bool:
+        if self.gateway is not None:
+            self.gateway.close_turn(thread_id, turn_id)
         await self.request("turn/interrupt", {"threadId": thread_id, "turnId": turn_id})
         return True
 
@@ -823,6 +849,13 @@ class _AppServerClient:
                 await send.send(message)
 
     async def unsubscribe_turn(self, turn_id: str) -> None:
+        for key in list(self._items):
+            if key[0] == turn_id:
+                self._items.pop(key)
+        if self.gateway is not None:
+            for thread_id, active_turn in list(self.gateway.turns):
+                if active_turn == turn_id:
+                    self.gateway.close_turn(thread_id, turn_id)
         async with self._state_lock:
             sender = self._turn_senders.pop(turn_id, None)
         if sender is not None:
@@ -849,13 +882,14 @@ class _AppServerClient:
                     message = json.loads(line.decode("utf-8"))
                 except json.JSONDecodeError as exc:
                     raise RuntimeError(
-                        f"invalid JSON-RPC from codex app-server: {line!r}"
+                        "invalid JSON-RPC from codex app-server"
                     ) from exc
                 if not isinstance(message, dict):
                     continue
                 if "method" in message and "id" in message:
-                    response = self._handle_server_request(message)
-                    await self._write({"id": message["id"], "result": response})
+                    task = asyncio.create_task(self._respond_server_request(message))
+                    self._approval_tasks.add(task)
+                    task.add_done_callback(self._approval_tasks.discard)
                     continue
                 if "method" in message:
                     await self._route_notification(message)
@@ -872,19 +906,86 @@ class _AppServerClient:
         await self._fail_all(failure)
 
     def _handle_server_request(self, message: dict[str, Any]) -> dict[str, Any]:
+        """Fallback for unknown/malformed requests: grant no capability."""
         method = message.get("method")
-        params = message.get("params")
         if method in {
             "item/commandExecution/requestApproval",
             "item/fileChange/requestApproval",
         }:
-            return {"decision": "accept"}
-        if method == "item/permissions/requestApproval" and isinstance(params, dict):
-            permissions = params.get("permissions")
-            return {"scope": "turn", "permissions": permissions or {}}
+            return {"decision": "decline"}
+        if method == "item/permissions/requestApproval":
+            return {"scope": "turn", "permissions": {}}
         if method == "mcpServer/elicitation/request":
             return {"action": "decline", "content": None}
         return {}
+
+    async def _respond_server_request(self, message: dict[str, Any]) -> None:
+        response = self._handle_server_request(message)
+        params = message.get("params")
+        method = message.get("method")
+        try:
+            if (
+                self.gateway is not None
+                and isinstance(params, dict)
+                and method
+                in {
+                    "item/commandExecution/requestApproval",
+                    "item/fileChange/requestApproval",
+                }
+            ):
+                thread_id, turn_id = params.get("threadId"), params.get("turnId")
+                scope = self.gateway.turns.get((thread_id, turn_id))
+                if scope is not None:
+                    item = self._items.get((turn_id, params.get("itemId")), {})
+                    command = params.get("command") or item.get("command") or ""
+                    classification = Classification.DENY
+                    if (
+                        method == "item/commandExecution/requestApproval"
+                        and isinstance(command, str)
+                        and command
+                    ):
+                        cwd = Path(params.get("cwd") or item.get("cwd") or scope.root)
+                        classification = classify_command(
+                            command, root=scope.root, cwd=cwd
+                        )
+                        # Escalation is never auto-approved, even for test/read commands.
+                        if classification == Classification.AUTO_ALLOW:
+                            classification = Classification.REQUIRE_APPROVAL
+                    elif method == "item/fileChange/requestApproval":
+                        changes = item.get("changes")
+                        if isinstance(changes, list) and changes:
+                            try:
+                                for change in changes:
+                                    resolve_project_path(scope.root, change["path"])
+                            except (ValueError, OSError, KeyError):
+                                classification = Classification.DENY
+                            else:
+                                if not params.get("grantRoot"):
+                                    classification = Classification.AUTO_ALLOW
+                        command = "file change: " + ", ".join(
+                            str(c.get("path"))
+                            for c in changes or []
+                            if isinstance(c, dict)
+                        )
+                    accepted = await self.gateway.request(
+                        scope=scope,
+                        thread_id=thread_id,
+                        turn_id=turn_id,
+                        request_id=str(message["id"]),
+                        command=command,
+                        classification=classification,
+                    )
+                    # Turn may have closed while the Telegram send was in flight.
+                    if accepted and (thread_id, turn_id) in self.gateway.turns:
+                        response = {"decision": "accept"}
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("codex.approval.failed", error_type=type(exc).__name__)
+        try:
+            await self._write({"id": message["id"], "result": response})
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "codex.approval.response_failed", error_type=type(exc).__name__
+            )
 
     async def _route_response(self, message: dict[str, Any]) -> None:
         request_id = str(message.get("id"))
@@ -901,6 +1002,26 @@ class _AppServerClient:
         waiter.event.set()
 
     async def _route_notification(self, message: dict[str, Any]) -> None:
+        params = message.get("params") or {}
+        thread_id = params.get("threadId")
+        observed_turn = _app_notification_turn_id(message)
+        if self.gateway is not None:
+            if (
+                message.get("method") == "turn/started"
+                and thread_id in self._starting_scopes
+            ):
+                scope = self._starting_scopes[thread_id]
+                if scope is not None and observed_turn:
+                    self.gateway.register_turn(thread_id, observed_turn, scope)
+            if message.get("method") == "turn/completed":
+                logger.info(
+                    "codex.turn.ended", session=thread_id, turn_id=observed_turn
+                )
+                self.gateway.close_turn(thread_id, observed_turn)
+        if message.get("method") == "item/started" and observed_turn:
+            item = params.get("item")
+            if isinstance(item, dict) and isinstance(item.get("id"), str):
+                self._items[(observed_turn, item["id"])] = item
         turn_id = _app_notification_turn_id(message)
         if turn_id is None:
             return
@@ -915,6 +1036,11 @@ class _AppServerClient:
             return
 
     async def _fail_all(self, exc: BaseException) -> None:
+        for task in list(self._approval_tasks):
+            task.cancel()
+        if self.gateway is not None:
+            for thread_id, turn_id in list(self.gateway.turns):
+                self.gateway.close_turn(thread_id, turn_id)
         async with self._state_lock:
             waiters = list(self._waiters.values())
             self._waiters.clear()
@@ -1323,11 +1449,35 @@ class AppServerCodexRunner(ResumeTokenMixin, BaseRunner):
             if run_options.reasoning:
                 turn_params["effort"] = str(run_options.reasoning)
 
-        turn_started = await client.turn_start(thread_id, turn_params)
+        # Reapply boundaries on every turn, including resumed threads. No session
+        # policy amendments or danger-full-access fallbacks are accepted.
+        root = (get_run_base_dir() or Path.cwd()).resolve()
+        turn_params.update(
+            cwd=str(root),
+            approvalPolicy="untrusted",
+            sandboxPolicy={
+                "type": "workspaceWrite",
+                "writableRoots": [str(root)],
+                "networkAccess": False,
+                "excludeSlashTmp": True,
+                "excludeTmpdirEnvVar": True,
+            },
+        )
+        client._starting_scopes[thread_id] = CURRENT_SCOPE.get()
+        try:
+            turn_started = await client.turn_start(thread_id, turn_params)
+        finally:
+            client._starting_scopes.pop(thread_id, None)
         turn = turn_started.get("turn")
         if not isinstance(turn, dict) or not isinstance(turn.get("id"), str):
             raise RuntimeError("turn/start returned no turn id")
         turn_id = turn["id"]
+        logger.info(
+            "codex.turn.started", session=thread_id, turn_id=turn_id, worktree=str(root)
+        )
+        scope = CURRENT_SCOPE.get()
+        if client.gateway is not None and scope is not None:
+            client.gateway.register_turn(thread_id, turn_id, scope)
         control = _AppServerTurnControl(
             client=client, thread_id=thread_id, turn_id=turn_id
         )

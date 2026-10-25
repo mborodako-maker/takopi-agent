@@ -183,3 +183,15 @@ def test_telegram_files_settings_defaults() -> None:
     assert cfg.auto_put_mode == "upload"
     assert cfg.uploads_dir == "incoming"
     assert cfg.allowed_user_ids == []
+
+
+def test_empty_allowlist_refuses_backend_startup() -> None:
+    settings = TelegramTransportSettings(bot_token="test", chat_id=123)
+    with pytest.raises(ValueError, match="allowed_user_ids"):
+        telegram_backend.TelegramBackend().build_and_run(
+            transport_config=settings,
+            config_path=Path("test.toml"),
+            runtime=None,  # type: ignore[arg-type]
+            final_notify=False,
+            default_engine_override=None,
+        )

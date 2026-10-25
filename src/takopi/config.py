@@ -66,6 +66,7 @@ class ProjectConfig:
     default_engine: str | None = None
     worktree_base: str | None = None
     chat_id: int | None = None
+    test_command: str | None = None
 
     @property
     def worktrees_root(self) -> Path:

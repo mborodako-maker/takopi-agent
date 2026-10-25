@@ -70,7 +70,15 @@ def _drop_below_level(
 
 
 def _redact_text(value: str) -> str:
-    redacted = TELEGRAM_TOKEN_RE.sub("bot[REDACTED]", value)
+    redacted = re.sub(r"(?i)(bearer\s+)[^\s\"']+", r"\1[REDACTED]", value)
+    redacted = re.sub(r"\bsk-[A-Za-z0-9_-]{8,}", "[REDACTED_API_KEY]", redacted)
+    redacted = re.sub(
+        r"(?i)((?:password|passwd|token|api[_-]?key|secret|authorization)\s*[=:]\s*)[^\s,;\"']+",
+        r"\1[REDACTED]",
+        redacted,
+    )
+    redacted = re.sub(r"(https?://)[^/\s:@]+:[^/\s@]+@", r"\1[REDACTED]@", redacted)
+    redacted = TELEGRAM_TOKEN_RE.sub("bot[REDACTED]", redacted)
     return TELEGRAM_BARE_TOKEN_RE.sub("[REDACTED_TOKEN]", redacted)
 
 
@@ -86,7 +94,13 @@ def _redact_value(value: Any, memo: dict[int, Any]) -> Any:
         redacted: dict[Any, Any] = {}
         memo[obj_id] = redacted
         for key, val in value.items():
-            redacted[key] = _redact_value(val, memo)
+            if isinstance(key, str) and re.search(
+                r"(?i)token|password|passwd|api_key|secret|authorization|credential",
+                key,
+            ):
+                redacted[key] = "[REDACTED]"
+            else:
+                redacted[key] = _redact_value(val, memo)
         return redacted
     if isinstance(value, list):
         redacted_list: list[Any] = []

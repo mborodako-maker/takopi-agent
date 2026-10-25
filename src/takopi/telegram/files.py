@@ -8,6 +8,8 @@ import zipfile
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 
+from ..security import sensitive_path
+
 __all__ = [
     "ZipTooLargeError",
     "default_upload_name",
@@ -92,6 +94,8 @@ def resolve_path_within_root(root: Path, rel_path: Path) -> Path | None:
     target = (root / rel_path).resolve(strict=False)
     if not target.is_relative_to(root_resolved):
         return None
+    if sensitive_path(rel_path) or sensitive_path(target.relative_to(root_resolved)):
+        return None
     return target
 
 
@@ -102,6 +106,8 @@ def deny_reason(rel_path: Path, deny_globs: Sequence[str]) -> str | None:
     for pattern in deny_globs:
         if posix.match(pattern):
             return pattern
+    if sensitive_path(rel_path):
+        return "protected secret/configuration path"
     return None
 
 

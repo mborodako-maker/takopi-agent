@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 
 from .config import ProjectConfig, ProjectsConfig
+from .logging import get_logger
 from .context import RunContext
 from .utils.git import (
     git_is_worktree,
@@ -27,6 +29,8 @@ def resolve_run_cwd(
     project = projects.projects.get(context.project)
     if project is None:
         raise WorktreeError(f"unknown project {context.project!r}")
+    _validate_workspace(project.path)
+    _validate_workspace(project.worktrees_root)
     if context.branch is None:
         return project.path
     branch = _sanitize_branch(context.branch)
@@ -107,6 +111,9 @@ def _git_worktree_add(
     if result.returncode != 0:
         message = result.stderr.strip() or result.stdout.strip()
         raise WorktreeError(message or "git worktree add failed")
+    get_logger(__name__).info(
+        "worktree.created", root=str(root), worktree=str(worktree_path), branch=branch
+    )
 
 
 def _sanitize_branch(branch: str) -> str:
@@ -129,7 +136,15 @@ def _matches_project_branch(root: Path, branch: str) -> bool:
 
 
 def _ensure_within_root(root: Path, path: Path) -> None:
+    _validate_workspace(root)
+    _validate_workspace(path)
     root_resolved = root.resolve(strict=False)
     path_resolved = path.resolve(strict=False)
     if not path_resolved.is_relative_to(root_resolved):
         raise WorktreeError("branch path escapes the worktrees directory")
+
+
+def _validate_workspace(path: Path) -> None:
+    workspace = os.environ.get("TAKOPI_WORKSPACE_ROOT")
+    if workspace and not path.resolve().is_relative_to(Path(workspace).resolve()):
+        raise WorktreeError("project/worktree path escapes configured workspace root")
