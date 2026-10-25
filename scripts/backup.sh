@@ -3,7 +3,10 @@ set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 : "${BACKUP_DIR:?Set an absolute backup directory outside workspace and this repository}"
 [[ $BACKUP_DIR = /* ]]
-case "$BACKUP_DIR/" in "$PWD/"*) echo 'Backup must be outside the checkout' >&2; exit 1;; esac
+# Resolve symlinks and '..' before checking the secret-bearing archive location.
+BACKUP_DIR=$(realpath -m -- "$BACKUP_DIR")
+checkout_root=$(pwd -P)
+case "$BACKUP_DIR/" in "$checkout_root/"*) echo 'Backup must be outside the checkout' >&2; exit 1;; esac
 umask 077
 mkdir -p -- "$BACKUP_DIR"
 backup_name="takopi-$(date -u +%Y%m%dT%H%M%SZ).tar.gz"

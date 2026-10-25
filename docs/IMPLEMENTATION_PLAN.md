@@ -42,6 +42,23 @@ Use the command entry-point API for `takopi-jira`; PAT stays in a separate proxy
 
 ## Execution record
 
+### Current task verification
+
+- Existing implementation is already committed as `449ca12`; preserve it and
+  verify requirements before making targeted changes.
+- Baseline `just check`: 713 passed, coverage 81.79%, Ruff and ty passed. The
+  Unix-socket integration test requires execution outside the development
+  tool sandbox (which prohibits bind); no test is skipped.
+- Reconfirmed that the existing image fails the sandbox compatibility preflight
+  under the requested Docker security profile. VPS acceptance remains blocked;
+  do not relax capabilities, seccomp, AppArmor or Codex sandbox.
+- Follow-up Sprint 2 work: ensure DENY precedes outside-project approval,
+  inspect shell-decoded commands and attached option paths, constrain reader
+  options, and validate file-change move destinations/deletions. Add adversarial
+  regression tests, repeat full checks and rebuild the image.
+- Canonicalize backup destinations and put sandbox preflight before login in
+  the installation procedure. Record verified outcomes and remaining blockers.
+
 - Sprint 1 `just check`: 594 passed; coverage 81.44%.
 - Sprint 2 initial full check: 709 passed; coverage 81.65%; subsequent hardening
   checks recorded in IMPLEMENTATION_REPORT.md.
@@ -53,3 +70,15 @@ Use the command entry-point API for `takopi-jira`; PAT stays in a separate proxy
   preflight now fails closed. No privileged/unconfined fallback was added.
 - Real Telegram/Codex-login/VPS restart milestone remains an operator acceptance
   test; no external deployment or production access performed.
+
+### Follow-up validation outcome
+
+- Additional policy regressions: full `just check` 759 passed, coverage 81.85%.
+- Shell syntax, Compose configuration (placeholder credentials) and diff checks passed.
+- Isolated container diagnosis: Bubblewrap reports no permission to create a new
+  namespace; no sandbox/security-profile bypass introduced. Actual account-backed
+  VPS milestone remains open.
+
+- Current rebuild did not finish: npm EROFS, followed by unavailable Docker
+  daemon and host df Input/output error. No host service restart attempted.
+  Restore the Docker/filesystem environment before repeating build and probes.

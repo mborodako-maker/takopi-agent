@@ -9,7 +9,7 @@ Baseline: banteg/takopi v0.23.4 (e0123d4). No wholesale refactoring.
 | telegram/backend.py, bridge.py | Startup allowlist requirement and gateway wiring; transport bootstrap cannot be intercepted by command plugin. Backend config fields may conflict. |
 | telegram/loop.py | Fail-closed sender dispatch, gateway lifecycle, callback routing and small VPS command dispatch; conflicts around upstream routing/reload. Security checks must remain before all dispatch. |
 | telegram/parsing.py | Poll heartbeat and count-only update logging. Keep heartbeat after a successful polling response, including empty responses. |
-| runners/codex.py | Replace permissive approvals, run requests asynchronously, scope to turns, cache proposed file changes, revoke on interrupt/disconnect/completion, strip child secrets, explicit sandbox on every turn. Command plugins cannot intercept private JSON-RPC requests; highest conflict risk when upstream changes app-server protocol. |
+| runners/codex.py | Replace permissive approvals, run requests asynchronously, scope to turns, cache proposed file changes, validate kind and both move paths, review deletion/bulk changes, revoke on interrupt/disconnect/completion, strip child secrets, explicit sandbox on every turn. Command plugins cannot intercept private JSON-RPC requests; highest conflict risk when upstream changes app-server protocol. |
 | telegram/commands/executor.py | Bind authenticated sender and resolved worktree through contextvars for each run (including queued runs). Remove when upstream exposes equivalent per-run approval context. |
 | settings.py, config.py | Optional project test_command, configurable file cap, suppress credential inputs in validation errors. Small additive schema conflict risk. |
 | transport_runtime.py | Add read-only project_config accessor for commands; upstream could expose a public project context API. |
@@ -34,3 +34,9 @@ On upgrades: compare pinned official Codex generated JSON schema; check managed
 hooks are actually loaded; test unknown requests, multiple sessions, queued sender
 ownership, TTL, interrupt while awaiting approval, restart/resume, file filtering
 and worktree symlinks. Rerun `just check` and the VPS manual milestone.
+
+Follow-up audit keeps command parsing and file-change classification in
+security.py. DENY runs before alternate-cwd approval, shell-decoded words and
+attached option paths are inspected, and reader options use an explicit list.
+Unknown file-change kinds fail closed. Backup destinations are canonicalized
+before accepting them; these Docker/script changes do not affect upstream core.

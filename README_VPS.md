@@ -73,10 +73,15 @@ export COMPOSE_ENV_FILES=/srv/takopi-secrets/takopi.env
 ```bash
 sudoedit config/runtime/takopi.toml
 docker compose build
+docker compose run --rm takopi /usr/local/bin/sandbox-check.sh
 docker compose run --rm takopi git clone https://github.com/YOUR-ORG/jira-agent.git /workspace/jira-agent
 docker compose run --rm takopi git clone https://github.com/YOUR-ORG/onas.git /workspace/onas
 docker compose run --rm takopi codex login --device-auth
 ```
+
+Если sandbox-check завершился с ошибкой, остановитесь до login и запуска бота;
+см. раздел совместимости в конце инструкции. Этот шаг не требует credentials
+Codex и проверяет реальный container security profile.
 
 Откройте показанный официальный URL на своём компьютере и введите одноразовый
 код. Включите device code login в security settings ChatGPT, если требуется.
@@ -208,3 +213,8 @@ Entrypoint теперь отказывается запускать бот пр�
 проверьте поддержку rootless user namespaces и совместимость Codex с локальными
 seccomp/AppArmor policies. Не отключайте sandbox/seccomp/AppArmor и не добавляйте
 capabilities ради запуска. До успешной проверки реальный VPS milestone не пройден.
+
+Если сборка возвращает `EROFS` / `Input/output error` или Docker daemon недоступен,
+сначала восстановите filesystem/Docker на хосте. Это отдельная проблема среды,
+не повод изменять security profile контейнера. Повторите build и preflight после
+восстановления; текущий повторный аудит встретил именно такой сбой среды.

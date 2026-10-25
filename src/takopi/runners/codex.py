@@ -5,7 +5,7 @@ from ..security import (
     CURRENT_SCOPE,
     Classification,
     classify_command,
-    resolve_project_path,
+    classify_file_changes,
 )
 
 import asyncio
@@ -953,18 +953,24 @@ class _AppServerClient:
                             classification = Classification.REQUIRE_APPROVAL
                     elif method == "item/fileChange/requestApproval":
                         changes = item.get("changes")
-                        if isinstance(changes, list) and changes:
-                            try:
-                                for change in changes:
-                                    resolve_project_path(scope.root, change["path"])
-                            except (ValueError, OSError, KeyError):
-                                classification = Classification.DENY
-                            else:
-                                if not params.get("grantRoot"):
-                                    classification = Classification.AUTO_ALLOW
+                        if not params.get("grantRoot"):
+                            classification = classify_file_changes(
+                                changes, root=scope.root
+                            )
                         command = "file change: " + ", ".join(
-                            str(c.get("path"))
-                            for c in changes or []
+                            (
+                                str(c["kind"].get("type", "unknown")) + " "
+                                if isinstance(c.get("kind"), dict)
+                                else "unknown "
+                            )
+                            + str(c.get("path"))
+                            + (
+                                " -> " + str(c["kind"]["move_path"])
+                                if isinstance(c.get("kind"), dict)
+                                and c["kind"].get("move_path") is not None
+                                else ""
+                            )
+                            for c in (changes if isinstance(changes, list) else [])
                             if isinstance(c, dict)
                         )
                     accepted = await self.gateway.request(

@@ -76,3 +76,14 @@ and the milestone; if it fails, the environment is not ready. This environment's
 container smoke test encountered that restriction. End-to-end Telegram/login and
 sandbox behavior must be checked on the actual VPS; automated tests cannot prove
 that milestone without accounts and a compatible kernel/security profile.
+
+## Additional policy validation
+
+Unconditional command denials are evaluated before approval for a cwd outside
+the project. The classifier checks shell-decoded words, attached absolute option
+paths and symlink-resolved option values. Reader options outside an explicit
+list require review. This is conservative parsing, not a general shell proof.
+App-server file changes validate both source and move destination, reject unknown
+change kinds, and require approval for deletion or more than 20 changes.
+Backup rejects canonical destinations under the checkout, including symlink and
+parent-directory aliases, so archives containing credentials cannot enter workspace.

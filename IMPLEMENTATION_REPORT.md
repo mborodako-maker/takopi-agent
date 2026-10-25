@@ -7,6 +7,12 @@
 streaming, chat/topic sessions, resume, steer и interrupt. Jira не реализована,
 внешний deployment, push и merge не выполнялись.
 
+Повторный аудит текущего задания проверил уже существующий commit `449ca12`
+и устранил дополнительные обходы DENY через cwd/кавычки/слитные опции,
+непроверенные move destinations и автоматическое разрешение удаления в
+file-change requests. Backup теперь проверяет канонический путь назначения;
+container sandbox preflight перенесён непосредственно перед login в README.
+
 Это проверенная реализация с известными границами, **не подтверждённый production
 milestone на VPS**. Текущий Docker-хост не предоставляет необходимые Bubblewrap
 namespaces при заданном профиле безопасности. Startup прекращается, если sandbox
@@ -22,7 +28,8 @@ namespaces при заданном профиле безопасности. Star
 - `scripts/install.sh`, `backup.sh`, `update.sh`;
 - `src/takopi/security.py`, `codex_hook.py`, `telegram/approval.py`,
   `telegram/commands/vps.py`;
-- `tests/test_vps_security.py`, `tests/test_vps_commands.py`;
+- `tests/test_vps_security.py`, `tests/test_vps_commands.py`,
+  `tests/test_vps_scripts.py` (добавлен при повторном аудите);
 - `README_VPS.md`, `SECURITY.md`, `docs/IMPLEMENTATION_PLAN.md`,
   `docs/UPSTREAM_CHANGES.md`, `docs/JIRA_PLUGIN_DESIGN.md`, этот отчёт.
 
@@ -72,6 +79,9 @@ Bridge Git operations отключают repository hooks/fsmonitor.
 - TTL, доставка, wrong user/chat, replay, request/turn revocation;
 - actual local Unix socket hook integration, audit redaction, file-change approvals;
 - path traversal, symlink escape, mandatory .env/key/auth/credentials filtering;
+- дополнительные regression tests: DENY независимо от cwd, shell-decoded sudo/
+  rm/docker.sock, attached option paths, reader flags, file-change kind/move/
+  deletion/bulk changes, backup destinations через symlink и `..`;
 - настоящие временные Git repositories, стандартное создание/reuse worktrees;
 - diff с secret exclusions/новыми файлами, configured tests argv, commit confirmation
   и изменение index, upstream turn/interrupt и локальная `/abort`;
@@ -91,9 +101,15 @@ integration проверки внутри него не может пройти.
 ## 6. Результат
 
 Sprint 1: **594 passed**, coverage **81.44%**.
-Финальный полный набор: **713 passed**, coverage **81.79%**; Ruff/ty прошли.
+Baseline повторного аудита: **713 passed**, coverage **81.79%**.
+Полный набор после исправлений: **759 passed**, coverage **81.85%**; Ruff/ty прошли.
 Пять существующих ty warnings из upstream не являются ошибками; threshold 81%
-не уменьшался. Compose validation и Docker build прошли.
+не уменьшался. Compose validation прошла. Предыдущая сборка image была успешной;
+**повторная сборка текущих изменений не завершена**: `npm install` получил
+`EROFS: read-only file system`, затем Docker daemon стал недоступен; запуск
+хостового `df` также вернул `Input/output error`. Сервис Docker и посторонние
+контейнеры не перезапускались. Нельзя считать текущий image проверенным до
+восстановления среды и повторного build/smoke test.
 
 Container app-server и managed requirements probe прошли. Sandbox smoke test
 **не прошёл из-за запрета user namespaces текущим host/container profile**;
@@ -114,6 +130,9 @@ Backup/restore/update и проверка persistence описаны там же
 
 ## 8. Известные ограничения
 
+- Дополнительный blocker текущей среды: EROFS/I/O errors и недоступный Docker
+  daemon не позволили закончить повторный build. Сначала восстановить filesystem
+  и Docker средствами администратора, затем повторить сборку и container probes.
 - Milestone на реальном VPS остаётся открытым до успешного sandbox smoke test,
   Telegram/Codex login и ручной проверки сценария restart. Нельзя устранить
   выявленную несовместимость отключением sandbox/seccomp/AppArmor или privileged.
@@ -139,7 +158,7 @@ Backup/restore/update и проверка persistence описаны там же
 
 ## 9. Sprint 3
 
-Сначала решить и проверить sandbox compatibility на целевом VPS без ослабления
+Сначала восстановить Docker build environment (EROFS/I/O), затем решить и проверить sandbox compatibility на целевом VPS без ослабления
 контролей. Затем разделить bridge и workers по OS identity/container, передавать
 worker только один project/worktree и не монтировать bot config/auth в executable
 worker context; credential broker, ограниченный egress proxy, syscall/FS policy,

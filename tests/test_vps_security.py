@@ -14,6 +14,7 @@ from takopi.security import (
     AuditLog,
     Classification as C,
     classify_command,
+    classify_file_changes,
     command_preview,
     resolve_project_path,
 )
@@ -162,6 +163,90 @@ def test_paths_and_symlinks(tmp_path):
     assert classify_command("pwd", root=root, cwd=outside) == C.REQUIRE_APPROVAL
     assert classify_command("", root=root) == C.DENY
     assert classify_command("'", root=root) == C.DENY
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "sudo apt install pkg",
+        "s'u'do id",
+        r"s\udo id",
+        "'rm' '-rf' /",
+        "cat /etc/passwd",
+        "cat /tmp/../etc/passwd",
+        "cat /var/run/docker.so''ck",
+        "grep -f/etc/passwd hello.txt",
+        "rg --file=/proc/self/environ hello.txt",
+        "docker run --privileged image",
+    ],
+)
+@pytest.mark.parametrize("external_cwd", [False, True])
+def test_unconditional_denials_survive_decoding_and_external_cwd(
+    tmp_path, command, external_cwd
+):
+    root = tmp_path / "project"
+    root.mkdir()
+    cwd = tmp_path if external_cwd else root
+    assert classify_command(command, root=root, cwd=cwd) == C.DENY
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "grep -R hello .",
+        "grep -fpatterns.txt hello.txt",
+        "rg --hidden hello .",
+        "rg --no-ignore hello .",
+        "rg -L hello .",
+        "wc --files0-from=paths.txt",
+        "find -L .",
+    ],
+)
+def test_reader_options_do_not_inherit_auto_allow(tmp_path, command):
+    assert classify_command(command, root=tmp_path) == C.REQUIRE_APPROVAL
+
+
+def test_option_paths_resolve_symlinks_and_system_cwd_is_denied(tmp_path):
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / "link").symlink_to(tmp_path, target_is_directory=True)
+    assert classify_command("rg --file=link/patterns hello", root=root) == C.DENY
+    assert classify_command("pwd", root=root, cwd=Path("/etc")) == C.DENY
+
+
+@pytest.mark.parametrize(
+    ("changes", "expected"),
+    [
+        ([{"path": "a.txt", "kind": {"type": "add"}}], C.AUTO_ALLOW),
+        ([{"path": "a.txt", "kind": {"type": "delete"}}], C.REQUIRE_APPROVAL),
+        (
+            [{"path": "a.txt", "kind": {"type": "update", "move_path": "b.txt"}}],
+            C.AUTO_ALLOW,
+        ),
+        (
+            [{"path": "a.txt", "kind": {"type": "update", "move_path": "../escape"}}],
+            C.DENY,
+        ),
+        ([{"path": "a.txt", "kind": {"type": "update", "move_path": ".env"}}], C.DENY),
+        ([{"path": "a.txt", "kind": {"type": "mystery"}}], C.DENY),
+        ([{"path": "a.txt", "kind": {"type": []}}], C.DENY),
+        ([{"path": "a.txt"}], C.DENY),
+        ([None], C.DENY),
+        ([], C.DENY),
+        ("invalid", C.DENY),
+        ([{"path": "a.txt", "kind": {"type": "add"}}] * 21, C.REQUIRE_APPROVAL),
+    ],
+)
+def test_file_changes_validate_kind_and_both_move_paths(tmp_path, changes, expected):
+    assert classify_file_changes(changes, root=tmp_path) == expected
+
+
+def test_file_change_move_symlink_escape(tmp_path):
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / "link").symlink_to(tmp_path, target_is_directory=True)
+    changes = [{"path": "a.txt", "kind": {"type": "update", "move_path": "link/a"}}]
+    assert classify_file_changes(changes, root=root) == C.DENY
 
 
 @pytest.mark.parametrize(
@@ -488,10 +573,14 @@ async def test_file_change_approval_and_protected_path(tmp_path, monkeypatch):
         "method": "item/fileChange/requestApproval",
         "params": {"threadId": "thread", "turnId": "turn", "itemId": "item"},
     }
-    client._items[("turn", "item")] = {"changes": [{"path": "hello.txt"}]}
+    client._items[("turn", "item")] = {
+        "changes": [{"path": "hello.txt", "kind": {"type": "add"}}]
+    }
     await client._respond_server_request(message)
     assert writes[-1]["result"]["decision"] == "accept"
-    client._items[("turn", "item")] = {"changes": [{"path": ".env"}]}
+    client._items[("turn", "item")] = {
+        "changes": [{"path": ".env", "kind": {"type": "add"}}]
+    }
     await client._respond_server_request(message)
     assert writes[-1]["result"]["decision"] == "decline"
     await client._respond_server_request(
@@ -522,3 +611,12 @@ async def test_approval_ttl_includes_delivery_time(tmp_path, monkeypatch):
             classification=C.REQUIRE_APPROVAL,
         )
     assert not accepted and not gateway.store.pending
+
+
+def test_external_cwd_cannot_hide_protected_symlink(tmp_path):
+    root = tmp_path / "project"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "alias").symlink_to("/etc/passwd")
+    assert classify_command("cat alias", root=root, cwd=outside) == C.DENY

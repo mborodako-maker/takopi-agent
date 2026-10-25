@@ -93,13 +93,15 @@ def classify_command(
     try:
         args = shlex.split(command)
         base = (cwd or root).resolve(strict=True)
-        if not base.is_relative_to(root.resolve(strict=True)):
-            return Classification.REQUIRE_APPROVAL
+        project_root = root.resolve(strict=True)
+        outside = not base.is_relative_to(project_root)
     except (ValueError, OSError, RuntimeError):
         return Classification.DENY
     if not args:
         return Classification.DENY
-    words = re.findall(r"[A-Za-z_][A-Za-z_0-9.-]*", command)
+    # shlex decoding also catches quoted/escaped executable names: s'u'do.
+    decoded = " ".join(args)
+    words = re.findall(r"[A-Za-z_][A-Za-z_0-9.-]*", decoded)
     if any(word in FORBIDDEN_COMMANDS for word in words):
         return Classification.DENY
     if any(
@@ -107,8 +109,8 @@ def classify_command(
         for arg in args
     ):
         return Classification.DENY
-    if "docker.sock" in command or re.search(
-        r"rm\s+.*-[A-Za-z]*[rf][A-Za-z]*\s+[/~]", command
+    if "docker.sock" in decoded or re.search(
+        r"rm\s+.*-[A-Za-z]*[rf][A-Za-z]*\s+[/~]", decoded
     ):
         return Classification.DENY
     if args[0].split("/")[-1] == "rm" and any(
@@ -117,17 +119,50 @@ def classify_command(
         return Classification.DENY
     for arg in args:
         # Also inspect paths embedded in flags, assignments, and URLs.
-        for value in re.split(r"[=,:]", arg):
+        values = re.split(r"[=,:]", arg)
+        # Short options can carry a filename without a separator: grep -f/etc/...
+        if arg.startswith("-") and "/" in arg:
+            values.append(arg[arg.index("/") :])
+        for value in values:
             if any(value == p or value.startswith(p + "/") for p in SYSTEM_ROOTS):
                 return Classification.DENY
             if sensitive_path(Path(value)):
                 return Classification.DENY
+            if not value.startswith("-") and ("/" in value or (base / value).exists()):
+                try:
+                    target = (base / value).resolve(strict=False)
+                    if any(
+                        target == Path(p) or Path(p) in target.parents
+                        for p in SYSTEM_ROOTS
+                    ):
+                        return Classification.DENY
+                    checked = (
+                        target.relative_to(project_root)
+                        if target.is_relative_to(project_root)
+                        else target
+                    )
+                    if sensitive_path(checked):
+                        return Classification.DENY
+                except (ValueError, OSError, RuntimeError):
+                    return Classification.DENY
+    if any(base == Path(p) or Path(p) in base.parents for p in SYSTEM_ROOTS):
+        return Classification.DENY
+    # An alternate cwd must never turn an unconditional denial into an approval.
+    if outside:
+        return Classification.REQUIRE_APPROVAL
     if any(c in command for c in "\n\r;&|<>`$*?{}()\\"):
         return Classification.REQUIRE_APPROVAL
     if any(a.startswith(("~", "../")) or a == ".." for a in args):
         return Classification.REQUIRE_APPROVAL
     for arg in args[1:]:
         if arg.startswith("-"):
+            # Check option values as paths too, including symlink destinations.
+            value = arg.split("=", 1)[-1] if "=" in arg else arg
+            if "/" in value or (base / value).exists():
+                try:
+                    resolve_project_path(root, base / value)
+                except (ValueError, OSError, RuntimeError):
+                    return Classification.DENY
             continue
         if "/" in arg or (base / arg).exists():
             try:
@@ -168,18 +203,55 @@ def classify_command(
     if tuple(args) in tests or args == ["pytest"]:
         return Classification.AUTO_ALLOW
     if tool in {"pwd", "ls", "cat", "head", "tail", "wc", "grep", "rg", "find"}:
-        if tool == "find" and any(
-            a not in {"-name", "-type", "-maxdepth", "-mindepth", "-print"}
-            for a in rest
-            if a.startswith("-")
+        # Readers have options that open extra files, follow symlinks, recurse
+        # through sensitive directories, or spawn preprocessors. Unknown options
+        # require review instead of inheriting the executable's AUTO_ALLOW.
+        reader_options = {
+            "pwd": {"-L", "-P"},
+            "ls": {"-l", "-a", "-la", "-al", "-h", "-lh", "-1"},
+            "cat": {"-n", "-b", "-s", "-v", "-E", "-T"},
+            "head": {"-n", "-c", "-q", "-v"},
+            "tail": {"-n", "-c", "-q", "-v"},
+            "wc": {"-l", "-w", "-c", "-m", "-L"},
+            "grep": {"-n", "-i", "-v", "-c", "-l", "-w", "-x", "-F", "-E", "-e"},
+            "rg": {"-n", "-i", "-v", "-c", "-l", "-w", "-x", "-F", "-e", "--files"},
+            "find": {"-name", "-type", "-maxdepth", "-mindepth", "-print"},
+        }
+        if any(
+            a.startswith("-") and a not in reader_options[tool] | {"--"} for a in rest
         ):
-            return Classification.REQUIRE_APPROVAL
-        if tool == "rg" and any(a.startswith(("--pre", "--search-zip")) for a in rest):
-            return Classification.REQUIRE_APPROVAL
-        if any(a.startswith(("--include", "--exclude")) and "=" in a for a in rest):
             return Classification.REQUIRE_APPROVAL
         return Classification.AUTO_ALLOW
     return Classification.REQUIRE_APPROVAL
+
+
+def classify_file_changes(changes: Any, *, root: Path) -> Classification:
+    """Validate both ends of app-server moves and review destructive changes."""
+    if not isinstance(changes, list) or not changes:
+        return Classification.DENY
+    destructive = len(changes) > 20
+    try:
+        for change in changes:
+            if not isinstance(change, dict) or not isinstance(change.get("path"), str):
+                return Classification.DENY
+            resolve_project_path(root, change["path"])
+            kind = change.get("kind")
+            if not isinstance(kind, dict) or not isinstance(kind.get("type"), str):
+                return Classification.DENY
+            if kind["type"] not in {
+                "add",
+                "update",
+                "delete",
+            }:
+                return Classification.DENY
+            destructive |= kind["type"] == "delete"
+            if kind.get("move_path") is not None:
+                if kind["type"] != "update" or not isinstance(kind["move_path"], str):
+                    return Classification.DENY
+                resolve_project_path(root, kind["move_path"])
+    except (ValueError, OSError, RuntimeError):
+        return Classification.DENY
+    return Classification.REQUIRE_APPROVAL if destructive else Classification.AUTO_ALLOW
 
 
 @dataclass(frozen=True, slots=True)
