@@ -40,3 +40,14 @@ security.py. DENY runs before alternate-cwd approval, shell-decoded words and
 attached option paths are inspected, and reader options use an explicit list.
 Unknown file-change kinds fail closed. Backup destinations are canonicalized
 before accepting them; these Docker/script changes do not affect upstream core.
+
+
+## Deployment architecture correction
+
+Local builds use compose.dev.yaml; production uses deploy/compose.yaml with
+explicit IMAGE_REPOSITORY/IMAGE_TAG and persistent runtime bind mounts. The root
+docker-compose.yml is a local compatibility entry point. GitHub Actions Docker
+workflow gates Buildx/GHCR publication on full checks and Compose validation.
+update-vps.sh pulls/recreates only; update.sh delegates to it. Backup supports
+TAKOPI_RUNTIME_DIR without changing the credential-bearing archive boundary.
+No runtime/security engine or Telegram integration changes were necessary.

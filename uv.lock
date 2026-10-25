@@ -950,6 +950,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-anyio" },
     { name = "pytest-cov" },
+    { name = "pyyaml" },
     { name = "ruff" },
     { name = "ty" },
 ]
@@ -982,6 +983,7 @@ dev = [
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-anyio", specifier = ">=0.0.0" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "ruff", specifier = ">=0.14.10" },
     { name = "ty", specifier = ">=0.0.8" },
 ]

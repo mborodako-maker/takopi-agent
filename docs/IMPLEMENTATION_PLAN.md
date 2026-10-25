@@ -82,3 +82,15 @@ Use the command entry-point API for `takopi-jira`; PAT stays in a separate proxy
 - Current rebuild did not finish: npm EROFS, followed by unavailable Docker
   daemon and host df Input/output error. No host service restart attempted.
   Restore the Docker/filesystem environment before repeating build and probes.
+
+
+## Deployment architecture correction (CODEX_TASK_NEW.md)
+
+Preserve the committed Sprint 1/2 implementation and all security controls.
+Separate compose.dev.yaml local builds from deploy/compose.yaml image-only
+production. Publish GHCR images with latest (main), sha-* and v* tags through
+GitHub Actions only after the full test/check gate. No SSH deployment.
+Keep production source-free at /srv/takopi with persistent config, Codex auth,
+Takopi state, logs and separate project repositories. Add pull/recreate update,
+explicit-tag rollback, backup/restore migration instructions and architecture
+regressions. Verification outcomes: CHANGE_IMPLEMENTATION_REPORT.md.

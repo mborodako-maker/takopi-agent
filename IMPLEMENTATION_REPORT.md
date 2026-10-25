@@ -1,5 +1,10 @@
 # IMPLEMENTATION REPORT
 
+Исторический отчёт Sprint 1/2 и security audit. Deployment впоследствии изменён:
+актуальная схема GHCR/VPS описана в README_VPS.md, README_LOCAL_DEV.md
+и CHANGE_IMPLEMENTATION_REPORT.md; старые инструкции clone/build на VPS ниже
+сохранены только как запись предыдущего этапа.
+
 ## 1. Что изменено
 
 Подготовлены Docker/VPS профиль и Approval Gateway поверх Takopi 0.23.4.

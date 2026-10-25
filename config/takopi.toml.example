@@ -1,4 +1,5 @@
-# Copy to config/runtime/takopi.toml. No credentials in this file.
+# Local: config/runtime/takopi.toml. Production: /srv/takopi/config/takopi.toml.
+# No credentials in this file.
 transport = "telegram"
 default_engine = "codex"
 default_project = "jira-agent"

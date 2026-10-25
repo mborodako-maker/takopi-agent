@@ -33,3 +33,30 @@ async def test_backup_rejects_resolved_checkout_destination(tmp_path, route):
     assert result.returncode != 0
     assert b"Backup must be outside the checkout" in result.stderr
     assert not destination.exists()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("route", ["direct", "symlink", "parent"])
+async def test_backup_rejects_external_runtime_destination(tmp_path, route):
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    destination = runtime / "workspace" / "backups"
+    if route == "symlink":
+        alias = tmp_path / "runtime-alias"
+        alias.symlink_to(runtime, target_is_directory=True)
+        destination = alias / "backups"
+    elif route == "parent":
+        destination = runtime / ".." / "runtime" / "backups"
+    script = Path(__file__).resolve().parents[1] / "scripts" / "backup.sh"
+    result = await anyio.run_process(
+        ["bash", str(script)],
+        env={
+            **os.environ,
+            "TAKOPI_RUNTIME_DIR": str(runtime),
+            "BACKUP_DIR": str(destination),
+        },
+        check=False,
+    )
+    assert result.returncode != 0
+    assert b"Backup must be outside the checkout" in result.stderr
+    assert not destination.exists()

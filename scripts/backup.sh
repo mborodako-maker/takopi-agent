@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+cd -- "${TAKOPI_RUNTIME_DIR:-$(dirname -- "${BASH_SOURCE[0]}")/..}"
 : "${BACKUP_DIR:?Set an absolute backup directory outside workspace and this repository}"
 [[ $BACKUP_DIR = /* ]]
 # Resolve symlinks and '..' before checking the secret-bearing archive location.

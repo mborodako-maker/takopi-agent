@@ -1,0 +1,60 @@
+services:
+  takopi:
+    image: ${IMAGE_REPOSITORY:?Set IMAGE_REPOSITORY to ghcr.io/owner/takopi-agent}:${IMAGE_TAG:?Set an explicit IMAGE_TAG}
+    user: "1001:1001"
+    init: false # tini is the image entrypoint
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: ${CONTAINER_MEMORY_LIMIT:-4G}
+    cpus: "${CONTAINER_CPU_LIMIT:-2.0}"
+    pids_limit: 256
+    stop_grace_period: 30s
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN}
+      TELEGRAM_ALLOWED_USER_IDS: ${TELEGRAM_ALLOWED_USER_IDS:?Set TELEGRAM_ALLOWED_USER_IDS}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:?Set TELEGRAM_CHAT_ID}
+      TZ: ${TZ:-Europe/Minsk}
+    volumes:
+      - type: bind
+        source: ./workspace
+        target: /workspace
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./data/takopi
+        target: /home/codex/.takopi
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./config/takopi.toml
+        target: /home/codex/.takopi/takopi.toml
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./data/codex
+        target: /home/codex/.codex
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./data/logs
+        target: /var/log/takopi
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=512m,uid=1001,gid=1001,mode=1777
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

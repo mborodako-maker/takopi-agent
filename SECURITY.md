@@ -85,5 +85,8 @@ paths and symlink-resolved option values. Reader options outside an explicit
 list require review. This is conservative parsing, not a general shell proof.
 App-server file changes validate both source and move destination, reject unknown
 change kinds, and require approval for deletion or more than 20 changes.
-Backup rejects canonical destinations under the checkout, including symlink and
-parent-directory aliases, so archives containing credentials cannot enter workspace.
+Backup rejects canonical destinations under the checkout or selected production
+runtime root, including symlink and parent-directory aliases, so archives containing
+credentials cannot enter workspace. Production mounts only workspace/config/state/
+auth/log directories; the bridge source checkout and host registry credentials are
+not mounted. Images are built and published after checks in GitHub Actions.
