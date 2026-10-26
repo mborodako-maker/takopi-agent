@@ -65,6 +65,12 @@ Push в `master`/`main`, tag `v*` или ручной запуск workflow `Doc
 Для production выберите существующий `v*` или `sha-*` tag, см. README_VPS.md.
 Изменения кода, lockfile и Dockerfile делаются здесь, а не на VPS.
 
+Уведомления о commit после успешного CI включаются через repository Actions
+secrets `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHAT_ID`. Без этих настроек отправка
+пропускается. Ошибка отправки при настроенных secrets отображается отдельно;
+бот должен иметь доступ к выбранному чату. Эти secrets на GitHub не заполняются
+автоматически из конфигурации VPS.
+
 Для Linux-хостов с запрещённым nested user namespace используйте явно
 установленные профили по deploy/security/README.md. Enforcement-проверка
 scripts/check-sandbox.py предназначена для контейнера с этим overlay.
