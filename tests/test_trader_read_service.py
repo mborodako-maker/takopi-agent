@@ -39,10 +39,12 @@ class ReadOnlyReports(unittest.TestCase):
         self.assertEqual(
             read_report(self.path, "shadow_status", ""), {"mode": "SHADOW"}
         )
-        self.assertEqual(read_report(self.path, "market", "BTC")["price"], "100")
-        self.assertEqual(
-            read_report(self.path, "signals", "")[0]["decision"], "NO_TRADE"
-        )
+        market = read_report(self.path, "market", "BTC")
+        assert isinstance(market, dict)
+        self.assertEqual(market["price"], "100")
+        signals = read_report(self.path, "signals", "")
+        assert isinstance(signals, list)
+        self.assertEqual(signals[0]["decision"], "NO_TRADE")
         with sqlite3.connect(self.path) as db:
             self.assertEqual(
                 db.execute("SELECT count(*) FROM signals").fetchone()[0], 1
