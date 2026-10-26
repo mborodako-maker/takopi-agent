@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-codex --version >/dev/null 2>&1
+env -i HOME="$HOME" PATH="$PATH" codex --version >/dev/null 2>&1
 python -c '
 import os, time
 from pathlib import Path

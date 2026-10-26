@@ -1,13 +1,5 @@
 from __future__ import annotations
 
-from ..security import (
-    CURRENT_GATEWAY,
-    CURRENT_SCOPE,
-    Classification,
-    classify_command,
-    classify_file_changes,
-)
-
 import asyncio
 import json
 import os
@@ -23,15 +15,24 @@ import anyio
 import msgspec
 
 from ..backends import EngineBackend, EngineConfig
+from ..codex_env import safe_codex_env
 from ..config import ConfigError
 from ..events import EventFactory
 from ..logging import get_logger
 from ..model import ActionPhase, EngineId, ResumeToken, TakopiEvent
 from ..runner import BaseRunner, JsonlSubprocessRunner, ResumeTokenMixin, Runner
-from .run_options import get_run_options
 from ..schemas import codex as codex_schema
+from ..security import (
+    CURRENT_GATEWAY,
+    CURRENT_SCOPE,
+    Classification,
+    classify_command,
+    classify_file_changes,
+)
 from ..utils.paths import get_run_base_dir, relativize_command
 from ..utils.streams import drain_stderr, iter_bytes_lines
+from ..utils.subprocess import kill_process, terminate_process, wait_for_process
+from .run_options import get_run_options
 
 logger = get_logger(__name__)
 
@@ -481,6 +482,9 @@ class CodexRunner(ResumeTokenMixin, JsonlSubprocessRunner):
     def command(self) -> str:
         return self.codex_cmd
 
+    def env(self, *, state: Any) -> dict[str, str]:
+        return safe_codex_env()
+
     def build_args(
         self,
         prompt: str,
@@ -706,6 +710,24 @@ class _AppServerClient:
         self._items: dict[tuple[str, str], dict[str, Any]] = {}
         self.gateway: Any = None
 
+    async def close(self) -> None:
+        """Stop an owned maintenance worker, including its process group."""
+        proc = self._proc
+        if proc is None:
+            return
+        with anyio.CancelScope(shield=True):
+            terminate_process(proc)
+            if await wait_for_process(proc, timeout=2):
+                kill_process(proc)
+                await proc.wait()
+            tasks = [t for t in (self._reader_task, self._stderr_task) if t is not None]
+            tasks.extend(self._approval_tasks)
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            await proc.aclose()
+            self._proc = None
+
     async def start(self) -> None:
         async with self._start_lock:
             if self._proc is not None:
@@ -726,16 +748,7 @@ class _AppServerClient:
             }
             if os.name == "posix":
                 kwargs["start_new_session"] = True
-            # Telegram credentials must never be inherited by Codex/tools.
-            kwargs["env"] = {
-                k: v
-                for k, v in os.environ.items()
-                if not k.startswith(("TELEGRAM_", "TAKOPI__"))
-                and not any(
-                    word in k.upper()
-                    for word in ("TOKEN", "PASSWORD", "SECRET", "API_KEY")
-                )
-            }
+            kwargs["env"] = safe_codex_env()
             self.gateway = CURRENT_GATEWAY.get()
             self._proc = await anyio.open_process(cmd, **kwargs)
 
@@ -1416,6 +1429,9 @@ class AppServerCodexRunner(ResumeTokenMixin, BaseRunner):
     engine: EngineId = ENGINE
     resume_re = _RESUME_RE
     logger = logger
+
+    async def aclose(self) -> None:
+        await self._client.close()
 
     def __init__(
         self,

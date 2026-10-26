@@ -23,6 +23,13 @@ RESERVED_CHAT_COMMANDS = frozenset(
         "diff",
         "tests",
         "commit",
+        "codex_task",
+        "trader_upgrade",
+        "market",
+        "signals",
+        "strategy",
+        "performance",
+        "shadow_status",
     }
 )
 RESERVED_ENGINE_IDS = RESERVED_CLI_COMMANDS | RESERVED_CHAT_COMMANDS
