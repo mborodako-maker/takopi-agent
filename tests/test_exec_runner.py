@@ -163,7 +163,7 @@ def test_find_exec_only_flag(extra_args: list[str], expected: str | None) -> Non
 
 @pytest.mark.anyio
 async def test_run_serializes_new_session_after_session_is_known(
-    tmp_path, monkeypatch
+    tmp_path,
 ) -> None:
     gate_path = tmp_path / "gate"
     resume_marker = tmp_path / "resume_started"
@@ -177,9 +177,9 @@ async def test_run_serializes_new_session_after_session_is_known(
         "import sys\n"
         "import time\n"
         "\n"
-        "gate = os.environ['CODEX_TEST_GATE']\n"
-        "resume_marker = os.environ['CODEX_TEST_RESUME_MARKER']\n"
-        "thread_id = os.environ['CODEX_TEST_THREAD_ID']\n"
+        f"gate = {str(gate_path)!r}\n"
+        f"resume_marker = {str(resume_marker)!r}\n"
+        f"thread_id = {thread_id!r}\n"
         "\n"
         "args = sys.argv[1:]\n"
         "if 'resume' in args:\n"
@@ -196,10 +196,6 @@ async def test_run_serializes_new_session_after_session_is_known(
         encoding="utf-8",
     )
     codex_path.chmod(0o755)
-
-    monkeypatch.setenv("CODEX_TEST_GATE", str(gate_path))
-    monkeypatch.setenv("CODEX_TEST_RESUME_MARKER", str(resume_marker))
-    monkeypatch.setenv("CODEX_TEST_THREAD_ID", thread_id)
 
     runner = CodexRunner(codex_cmd=str(codex_path), extra_args=[])
 
@@ -225,7 +221,8 @@ async def test_run_serializes_new_session_after_session_is_known(
 
     async with anyio.create_task_group() as tg:
         tg.start_soon(run_new)
-        await session_started.wait()
+        with anyio.fail_after(5):
+            await session_started.wait()
 
         tg.start_soon(run_resume)
         await anyio.sleep(0.01)
@@ -233,7 +230,8 @@ async def test_run_serializes_new_session_after_session_is_known(
         assert not resume_marker.exists()
 
         gate_path.write_text("go", encoding="utf-8")
-        await new_done.wait()
+        with anyio.fail_after(5):
+            await new_done.wait()
 
         with anyio.fail_after(2):
             while not resume_marker.exists():
@@ -492,7 +490,7 @@ async def test_codex_runner_includes_stderr_reason(tmp_path) -> None:
 
 @pytest.mark.anyio
 async def test_run_serializes_two_new_sessions_same_thread(
-    tmp_path, monkeypatch
+    tmp_path,
 ) -> None:
     gate_path = tmp_path / "gate"
     thread_id = "019b73c4-0c3f-7701-a0bb-aac6b4d8a3bc"
@@ -505,8 +503,8 @@ async def test_run_serializes_two_new_sessions_same_thread(
         "import sys\n"
         "import time\n"
         "\n"
-        "gate = os.environ['CODEX_TEST_GATE']\n"
-        "thread_id = os.environ['CODEX_TEST_THREAD_ID']\n"
+        f"gate = {str(gate_path)!r}\n"
+        f"thread_id = {thread_id!r}\n"
         "\n"
         "print(json.dumps({'type': 'thread.started', 'thread_id': thread_id}), flush=True)\n"
         "while not os.path.exists(gate):\n"
@@ -515,9 +513,6 @@ async def test_run_serializes_two_new_sessions_same_thread(
         encoding="utf-8",
     )
     codex_path.chmod(0o755)
-
-    monkeypatch.setenv("CODEX_TEST_GATE", str(gate_path))
-    monkeypatch.setenv("CODEX_TEST_THREAD_ID", thread_id)
 
     runner = CodexRunner(codex_cmd=str(codex_path), extra_args=[])
 
