@@ -1,5 +1,10 @@
 # takopi
 
+This fork also provides admin-only predefined maintenance tasks and read-only
+crypto research views. See [task runner](docs/CODEX_TASK_RUNNER.md),
+[crypto boundary](docs/TRADER_SKILL_ADAPTATION.md), [architecture](ARCHITECTURE.md).
+No real exchange execution is connected.
+
 🐙 *he just wants to help-pi*
 
 telegram bridge for codex, claude code, opencode, pi. manage multiple projects and worktrees, stream progress, and resume sessions anywhere.

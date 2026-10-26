@@ -7,6 +7,8 @@ import socket
 import subprocess
 import tempfile
 
+from takopi.codex_env import safe_codex_env
+
 
 def main() -> None:
     status = Path("/proc/self/status").read_text()
@@ -82,6 +84,7 @@ print(json.dumps({{'workspace_write': True, 'outside_writes_denied': len(blocked
             capture_output=True,
             text=True,
             timeout=30,
+            env=safe_codex_env(),
         )
         if result.returncode:
             raise RuntimeError(

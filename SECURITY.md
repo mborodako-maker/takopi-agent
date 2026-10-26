@@ -1,5 +1,10 @@
 # Security model
 
+Codex processes now use an explicit environment allowlist for exec/app-server
+and maintenance checks. Predefined tasks preserve the app-server gateway and
+sandbox; filenames never become shell commands. Crypto report commands only
+read SQLite state. See docs/CODEX_TASK_RUNNER.md for state/isolation requirements.
+
 This fork is for one VPS operator and explicitly trusted Telegram users/projects.
 It is **not** a multitenant sandbox for hostile repositories. Container isolation,
 Codex sandbox, managed hooks and approval requests provide different layers.

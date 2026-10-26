@@ -58,8 +58,9 @@ def test_local_build_is_separate():
 def test_publish_requires_full_checks_and_scoped_registry_permissions():
     workflow = load_yaml(".github/workflows/docker.yml")
     triggers = workflow["on"]
-    assert triggers["push"] == {"branches": ["main"], "tags": ["v*"]}
+    assert triggers["push"] == {"branches": ["master", "main"], "tags": ["v*"]}
     assert "workflow_dispatch" in triggers
+    assert "pull_request" in triggers
     assert workflow["permissions"] == {"contents": "read"}
     tests = workflow["jobs"]["tests"]["steps"]
     assert any(step.get("run") == "uv sync --frozen" for step in tests)
@@ -67,7 +68,7 @@ def test_publish_requires_full_checks_and_scoped_registry_permissions():
     assert "uv run pytest" in (ROOT / "Justfile").read_text()
     publish = workflow["jobs"]["publish"]
     assert publish["needs"] == "tests"
-    assert "if" not in publish  # Cannot publish after failed tests.
+    assert publish["if"] == "github.event_name != 'pull_request'"
     assert publish["permissions"] == {"contents": "read", "packages": "write"}
     steps = publish["steps"]
     assert any(
@@ -82,7 +83,7 @@ def test_publish_requires_full_checks_and_scoped_registry_permissions():
     assert "type=sha,prefix=sha-" in meta["tags"]
     assert "type=ref,event=tag" in meta["tags"]
     assert (
-        "type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}"
+        "type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' }}"
         in meta["tags"]
     )
     assert meta["flavor"] == "latest=false"

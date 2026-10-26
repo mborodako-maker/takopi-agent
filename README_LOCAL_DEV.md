@@ -60,7 +60,7 @@ Runtime содержит Python/Node/Git; дополнительные SDK до�
 
 ## Публикация
 
-Push в `main`, tag `v*` или ручной запуск workflow `Docker` запускает `just check`,
+Push в `master`/`main`, tag `v*` или ручной запуск workflow `Docker` запускает `just check`,
 проверки Compose и только затем Buildx build/publish. Никакого SSH deployment.
 Для production выберите существующий `v*` или `sha-*` tag, см. README_VPS.md.
 Изменения кода, lockfile и Dockerfile делаются здесь, а не на VPS.

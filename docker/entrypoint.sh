@@ -26,4 +26,7 @@ else
     unset TELEGRAM_BOT_TOKEN TELEGRAM_ALLOWED_USER_IDS TELEGRAM_CHAT_ID
     unset TAKOPI__TRANSPORTS__TELEGRAM__BOT_TOKEN
 fi
+if [ "${1:-}" = codex ]; then
+    exec python -c 'import os, sys; from takopi.codex_env import safe_codex_env; os.execvpe(sys.argv[1], sys.argv[1:], safe_codex_env())' "$@"
+fi
 exec "$@"

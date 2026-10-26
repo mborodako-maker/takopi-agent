@@ -1,0 +1,12 @@
+# Optional read-only access to state from the separate SHADOW worker.
+services:
+  takopi:
+    environment:
+      TAKOPI_TRADER_DB: /var/lib/crypto-trader/shadow.sqlite3
+    volumes:
+      - type: bind
+        source: ${TRADER_STATE_DIR:-/var/lib/crypto-trader}
+        target: /var/lib/crypto-trader
+        read_only: true
+        bind:
+          create_host_path: false
